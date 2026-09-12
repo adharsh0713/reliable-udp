@@ -1,0 +1,7 @@
+# Core project uses Python standard library only
+
+# Development tools
+pytest>=8.0
+matplotlib>=3.8
+pandas>=2.0
+numpy>=1.26
