@@ -1,5 +1,5 @@
 import socket
-from protocol.packet import Packet, DATA, END
+from protocol.packet import Packet, DATA, ACK, END
 
 HOST = "0.0.0.0"
 PORT = 5000
@@ -25,7 +25,16 @@ with open(OUTPUT_FILE, "wb") as file:
             break
 
         if packet.packet_type == DATA:
-            file.write(packet.payload)
+            ack = Packet(
+                packet.sequence,
+                ACK,
+                b""
+            )
+
+            sock.sendto(
+                ack.encode(),
+                address
+            )
 
 sock.close()
 

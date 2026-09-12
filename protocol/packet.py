@@ -2,8 +2,8 @@ import struct
 from protocol.crc import calculate_crc, verify_crc
 
 DATA = 0
-END = 1
-
+ACK = 1
+END = 2
 
 class Packet:
 

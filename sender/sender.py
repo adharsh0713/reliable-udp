@@ -2,6 +2,7 @@ import socket
 import sys
 
 from protocol.packet import Packet, DATA, END
+from algorithms.stop_wait import send_packet
 
 SERVER_IP = "127.0.0.1"
 SERVER_PORT = 5000
@@ -35,9 +36,10 @@ with open(filename, "rb") as file:
             payload=data
         )
 
-        sock.sendto(
-            packet.encode(),
-            (SERVER_IP, SERVER_PORT)
+        send_packet(
+            sock,
+            (SERVER_IP, SERVER_PORT),
+            packet
         )
 
         sequence += 1
