@@ -2,15 +2,16 @@ import socket
 import sys
 
 from protocol.packet import Packet, DATA, END
-# from algorithms.stop_wait import send_file
-from algorithms.stop_wait import send_packet
-# from algorithms.go_back_n import send_file
-from algorithms.selective_repeat import send_file
+from protocol.control import send_control_packet
+from algorithms.selector import get_protocol
+from config import (
+    PROTOCOL,
+    CHUNK_SIZE,
+    SERVER_IP,
+    SERVER_PORT
+)
 
-SERVER_IP = "127.0.0.1"
-SERVER_PORT = 5001
-BUFFER_SIZE = 1024
-CHUNK_SIZE = 20
+send_file = get_protocol(PROTOCOL)
 
 sock = socket.socket(
     socket.AF_INET,
@@ -30,7 +31,8 @@ sequence = 0
 with open(filename, "rb") as file:
 
     while True:
-
+        # Split file into fixed-size payload chunks
+        # Each chunk becomes an independent protocol packet
         data = file.read(CHUNK_SIZE)
 
         if not data:
@@ -59,7 +61,7 @@ end_packet = Packet(
     b""
 )
 
-send_packet(
+send_control_packet(
     sock,
     (SERVER_IP, SERVER_PORT),
     end_packet

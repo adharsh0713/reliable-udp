@@ -1,11 +1,18 @@
 import socket
+
 from protocol.packet import Packet, DATA, ACK, END
+from config import PROTOCOL, WINDOW_SIZE
+
+SUPPORTED = [
+    "stop_wait",
+    "go_back_n",
+    "selective_repeat"
+]
 
 HOST = "0.0.0.0"
 PORT = 5000
 BUFFER_SIZE = 1024
-OUTPUT_FILE = "data/results/received.txt"
-WINDOW_SIZE = 4
+OUTPUT_FILE = f"data/results/{PROTOCOL}_received.txt"
 
 sock = socket.socket(
     socket.AF_INET,
@@ -14,13 +21,31 @@ sock = socket.socket(
 
 sock.bind((HOST, PORT))
 
+
+# Used by Selective Repeat to store out-of-order packets
 receive_buffer = {}
 
+expected_sequence = 0
+
+
 print(f"Listening on UDP port {PORT}...")
+print(f"Protocol: {PROTOCOL}")
+
+
+def send_ack(sequence, address):
+    ack = Packet(
+        sequence,
+        ACK,
+        b""
+    )
+
+    sock.sendto(
+        ack.encode(),
+        address
+    )
 
 
 with open(OUTPUT_FILE, "wb") as file:
-    expected_sequence = 0
 
     while True:
 
@@ -30,39 +55,48 @@ with open(OUTPUT_FILE, "wb") as file:
             packet = Packet.decode(data)
 
         except ValueError:
-            print("Corrupted packet discarded  (CRC mismatch)")
+            print("Corrupted packet discarded (CRC mismatch)")
             continue
 
+
         if packet.packet_type == END:
-            ack = Packet(
-                packet.sequence,
-                ACK,
-                b""
+
+            # Do not close before buffered SR packets are written
+            if not receive_buffer:
+
+                send_ack(
+                    packet.sequence,
+                    address
+                )
+
+                print(
+                    f"Sent ACK {packet.sequence}"
+                )
+
+                break
+
+
+        if packet.packet_type != DATA:
+            continue
+
+
+        seq = packet.sequence
+
+        if PROTOCOL not in SUPPORTED:
+            raise ValueError(
+                f"Unsupported protocol: {PROTOCOL}"
             )
 
-            sock.sendto(
-                ack.encode(),
-                address
-            )
+        # ----------------------------
+        # Selective Repeat receiver
+        # ----------------------------
+        if PROTOCOL == "selective_repeat":
 
-            print(
-                f"Sent ACK {packet.sequence}"
-            )
-
-            break
-
-
-        if packet.packet_type == DATA:
-
-            seq = packet.sequence
-
-
-            # Packet inside receiver window
             if (
-                expected_sequence  <= seq < expected_sequence  + WINDOW_SIZE
+                expected_sequence <= seq <
+                expected_sequence + WINDOW_SIZE
             ):
 
-                # Store only first copy
                 if seq not in receive_buffer:
 
                     receive_buffer[seq] = packet.payload
@@ -77,27 +111,21 @@ with open(OUTPUT_FILE, "wb") as file:
                     )
 
 
-                # Send ACK for this packet
-                ack = Packet(
+                # Individual ACK
+                send_ack(
                     seq,
-                    ACK,
-                    b""
-                )
-
-                sock.sendto(
-                    ack.encode(),
                     address
                 )
 
 
-                # Deliver consecutive packets
-                while expected_sequence  in receive_buffer:
+                # Deliver packets in order
+                while expected_sequence in receive_buffer:
 
-                    data = receive_buffer.pop(
-                        expected_sequence 
+                    payload = receive_buffer.pop(
+                        expected_sequence
                     )
 
-                    file.write(data)
+                    file.write(payload)
 
                     print(
                         f"Wrote packet {expected_sequence}"
@@ -109,17 +137,83 @@ with open(OUTPUT_FILE, "wb") as file:
             else:
 
                 # Old packet, resend ACK
-                ack = Packet(
+                send_ack(
                     seq,
-                    ACK,
-                    b""
-                )
-
-                sock.sendto(
-                    ack.encode(),
                     address
                 )
 
+
+        # ----------------------------
+        # Go-Back-N receiver
+        # ----------------------------
+        elif PROTOCOL == "go_back_n":
+
+            if seq == expected_sequence:
+
+                file.write(
+                    packet.payload
+                )
+
+                print(
+                    f"Wrote packet {seq}"
+                )
+
+                send_ack(
+                    seq,
+                    address
+                )
+
+                expected_sequence += 1
+
+
+            else:
+
+                # Reject future packets
+                # Send ACK for last correctly received packet
+                if expected_sequence > 0:
+                    print(
+                        f"Out of order packet {seq}, expected {expected_sequence}"
+                    )
+
+                    send_ack(
+                        expected_sequence - 1,
+                        address
+                    )
+
+
+        # ----------------------------
+        # Stop-and-Wait receiver
+        # ----------------------------
+        elif PROTOCOL == "stop_wait":
+
+            if seq == expected_sequence:
+
+                file.write(
+                    packet.payload
+                )
+
+                print(
+                    f"Wrote packet {seq}"
+                )
+
+                send_ack(
+                    seq,
+                    address
+                )
+
+                expected_sequence += 1
+
+            else:
+
+                # Duplicate packet after timeout
+                send_ack(
+                    seq,
+                    address
+                )
+
+
 sock.close()
 
-print(f"File received: {OUTPUT_FILE}")
+print(
+    f"File received: {OUTPUT_FILE}"
+)
