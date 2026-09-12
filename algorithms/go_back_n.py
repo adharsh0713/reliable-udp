@@ -1,11 +1,7 @@
 import socket
 
 from protocol.packet import Packet, ACK
-
-
-WINDOW_SIZE = 4
-TIMEOUT = 2
-
+from config import TIMEOUT, WINDOW_SIZE
 
 class GoBackN:
 
@@ -57,7 +53,12 @@ class GoBackN:
             try:
                 data, _ = self.sock.recvfrom(1024)
 
-                ack_packet = Packet.decode(data)
+                try:
+                    ack_packet = Packet.decode(data)
+
+                except ValueError:
+                    print("Corrupted ACK discarded")
+                    continue
 
                 if ack_packet.packet_type == ACK:
 

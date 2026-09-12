@@ -1,7 +1,10 @@
-PROTOCOL = "selective_repeat"
+PROTOCOL = "go_back_n"
 
 WINDOW_SIZE = 4
 CHUNK_SIZE = 20
 
 SERVER_IP = "127.0.0.1"
 SERVER_PORT = 5001
+
+TIMEOUT = 2
+MAX_RETRIES = 5

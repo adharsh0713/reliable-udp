@@ -17,8 +17,7 @@ print("\nCorruption test:")
 
 corrupted = bytearray(encoded)
 
-# Flip one bit in payload
-corrupted[-1] ^= 1
+corrupted[0] ^= 1
 
 try:
     Packet.decode(bytes(corrupted))

@@ -1,5 +1,6 @@
 from protocol.packet import Packet, ACK
 from protocol.timer import Timer
+import socket
 
 TIMEOUT = 1
 MAX_TRIES = 5
@@ -50,7 +51,7 @@ def send_packet(sock, address, packet):
                 sock.settimeout(None)
                 return True
 
-        except TimeoutError:
+        except socket.timeout:
             print(
                 f"Timeout: packet {packet.sequence}"
             )

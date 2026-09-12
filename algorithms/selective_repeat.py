@@ -1,12 +1,7 @@
 from protocol.timer import Timer
 from protocol.packet import Packet, ACK
 import socket
-
-
-WINDOW_SIZE = 4
-TIMEOUT = 2
-MAX_RETRIES = 5
-
+from config import TIMEOUT, WINDOW_SIZE, MAX_RETRIES
 
 def send_file(sock, address, packets):
 
