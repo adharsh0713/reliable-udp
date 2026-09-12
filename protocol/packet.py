@@ -1,5 +1,5 @@
 import struct
-
+from protocol.crc import calculate_crc, verify_crc
 
 DATA = 0
 END = 1
@@ -7,42 +7,79 @@ END = 1
 
 class Packet:
 
-    HEADER_FORMAT = "!IBH"
+    HEADER_FORMAT = "!IBHI"
     HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
 
-    def __init__(self, sequence, packet_type, payload=b""):
+    def __init__(
+        self,
+        sequence,
+        packet_type,
+        payload,
+        crc=0
+    ):
         self.sequence = sequence
         self.packet_type = packet_type
         self.payload = payload
+        self.crc = crc
 
 
     def encode(self):
+        data = self.payload
 
-        header = struct.pack(
-            self.HEADER_FORMAT,
+        header_without_crc = struct.pack(
+            "!IBH",
             self.sequence,
             self.packet_type,
-            len(self.payload)
+            len(data)
         )
 
-        return header + self.payload
-
-
-    @classmethod
-    def decode(cls, raw):
-
-        sequence, packet_type, length = struct.unpack(
-            cls.HEADER_FORMAT,
-            raw[:cls.HEADER_SIZE]
+        checksum = calculate_crc(
+            header_without_crc + data
         )
 
-        payload = raw[
-            cls.HEADER_SIZE:
-            cls.HEADER_SIZE + length
-        ]
+        header = struct.pack(
+            "!IBHI",
+            self.sequence,
+            self.packet_type,
+            len(data),
+            checksum
+        )
 
-        return cls(
+        return header + data
+
+
+    @staticmethod
+    def decode(data):
+        sequence, packet_type, length, checksum = struct.unpack(
+            "!IBHI",
+            data[:11]
+        )
+
+        payload = data[11:11+length]
+
+        verify_data = struct.pack(
+            "!IBH",
             sequence,
             packet_type,
-            payload
+            length
+        ) + payload
+
+        if not verify_crc(
+            verify_data,
+            checksum
+        ):
+            raise ValueError("CRC mismatch")
+
+        return Packet(
+            sequence,
+            packet_type,
+            payload,
+            checksum
+        )
+
+    def __repr__(self):
+        return (
+            f"Packet(sequence={self.sequence}, "
+            f"type={self.packet_type}, "
+            f"payload={self.payload})"
         )
