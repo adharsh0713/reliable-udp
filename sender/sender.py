@@ -5,8 +5,9 @@ from protocol.packet import Packet, DATA, END
 from algorithms.stop_wait import send_packet
 
 SERVER_IP = "127.0.0.1"
-SERVER_PORT = 5000
+SERVER_PORT = 5001
 BUFFER_SIZE = 1024
+CHUNK_SIZE = 20
 
 sock = socket.socket(
     socket.AF_INET,
@@ -25,7 +26,7 @@ with open(filename, "rb") as file:
 
     while True:
 
-        data = file.read(BUFFER_SIZE)
+        data = file.read(CHUNK_SIZE)
 
         if not data:
             break
@@ -50,9 +51,10 @@ end_packet = Packet(
     b""
 )
 
-sock.sendto(
-    end_packet.encode(),
-    (SERVER_IP, SERVER_PORT)
+send_packet(
+    sock,
+    (SERVER_IP, SERVER_PORT),
+    end_packet
 )
 
 sock.close()

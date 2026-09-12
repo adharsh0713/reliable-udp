@@ -29,8 +29,33 @@ class FaultInjector:
         return random.random() < self.duplicate_rate
 
 
+    def process_packet_with_duplicate(self, data):
+        """
+        Returns:
+        None -> dropped
+        bytes -> normal packet
+        tuple -> duplicate packet
+        """
+
+        if self.should_drop():
+            print("FAULT: packet dropped")
+            return None
+
+        self.apply_delay()
+
+        if self.should_corrupt():
+            print("FAULT: packet corrupted")
+            data = self.corrupt_data(data)
+
+        if self.should_duplicate():
+            print("FAULT: packet duplicated")
+            return data, data
+
+        return data
+
     def apply_delay(self):
         if self.delay > 0:
+            print(f"FAULT: delaying packet by {self.delay}s")
             time.sleep(self.delay)
 
 
@@ -53,3 +78,22 @@ class FaultInjector:
         corrupted[index] ^= bit
 
         return bytes(corrupted)
+
+    def process_packet(self, data):
+        """
+        Returns:
+        None -> packet dropped
+        bytes -> packet forwarded
+        """
+
+        if self.should_drop():
+            print("FAULT: packet dropped")
+            return None
+
+        self.apply_delay()
+
+        if self.should_corrupt():
+            print("FAULT: packet corrupted")
+            data = self.corrupt_data(data)
+
+        return data

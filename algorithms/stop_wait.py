@@ -31,7 +31,12 @@ def send_packet(sock, address, packet):
         try:
             data, _ = sock.recvfrom(1024)
 
-            ack = Packet.decode(data)
+            try:
+                ack = Packet.decode(data)
+
+            except ValueError:
+                print("Corrupted ACK discarded")
+                continue
 
             if (
                 ack.packet_type == ACK

@@ -1,19 +1,24 @@
 from network.fault_injector import FaultInjector
 
+
 injector = FaultInjector(
-    loss_rate=0.2
+    loss_rate=0.0,
+    corruption_rate=0.5
 )
 
-# for i in range(10):
-#     if injector.should_drop():
-#         print("Packet dropped")
 
-#     else:
-#         print("Packet delivered")
+packet = b"hello"
 
-data = b"hello"
 
-corrupted = injector.corrupt_data(data)
+for i in range(10):
 
-print(data)
-print(corrupted)
+    result = injector.process_packet(packet)
+
+    if result is None:
+        print("Dropped")
+
+    elif result != packet:
+        print("Corrupted")
+
+    else:
+        print("Delivered")
