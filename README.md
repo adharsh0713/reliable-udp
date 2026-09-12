@@ -28,10 +28,14 @@ Implemented features:
   * Delay
   * Duplication
 
-Future phases:
+Implemented reliability protocols:
 
-* Go-Back-N sliding window
-* Selective Repeat
+* Stop-and-Wait ARQ
+* Go-Back-N Sliding Window
+* Selective Repeat Sliding Window
+
+Current focus:
+
 * Performance evaluation and comparison
 
 ---
@@ -178,7 +182,7 @@ It can introduce:
 Open terminal 3:
 
 ```bash
-python -m sender.sender
+python -m sender.sender data/test_files/sample.txt
 ```
 
 The sender transfers the file through the proxy.
@@ -396,6 +400,174 @@ Proxy
 
 Receiver
 ```
+
+---
+
+**# Phase 6 — Go-Back-N Sliding Window Protocol**
+
+Completed.
+
+Implemented Go-Back-N reliability using:
+
+\* Sliding window mechanism
+
+\* Multiple packets in transmission
+
+\* Cumulative ACK handling
+
+\* Timeout based window retransmission
+
+\* Sequence number tracking
+
+
+Working flow:
+
+\`\`\`
+
+Window size = N
+
+
+Send:
+
+[0][1][2][3]
+
+
+Receive ACKs
+
+
+Move window forward
+
+\`\`\`
+
+
+Example:
+
+\`\`\`
+
+Sending packet 0
+
+Sending packet 1
+
+Sending packet 2
+
+Sending packet 3
+
+
+ACK received 0
+
+ACK received 1
+
+\`\`\`
+
+
+Timeout handling:
+
+\`\`\`
+
+Timeout. Resending window
+
+
+Sending packet 2
+
+Sending packet 3
+
+\`\`\`
+
+
+Receiver behavior:
+
+\* Accepts packets in order
+
+\* Sends cumulative acknowledgements
+
+\* Rejects out-of-order packets
+
+\* Requests retransmission from missing packet onwards
+
+---
+
+**# Phase 7 — Selective Repeat Sliding Window Protocol**
+
+Completed.
+
+Implemented Selective Repeat reliability using:
+
+\* Individual packet ACK handling
+
+\* Receiver buffering
+
+\* Individual packet timers
+
+\* Selective packet retransmission
+
+
+Working flow:
+
+\`\`\`
+
+Window:
+
+[0][1][2][3]
+
+
+Packet 1 lost
+
+
+Receiver:
+
+0 received
+
+2 buffered
+
+3 buffered
+
+
+Only packet 1 retransmitted
+
+\`\`\`
+
+
+Sender behavior:
+
+\* Maintains timer for each packet
+
+\* Tracks acknowledged packets individually
+
+\* Retransmits only expired packets
+
+
+Receiver behavior:
+
+\* Accepts packets within receiver window
+
+\* Stores out-of-order packets
+
+\* Sends ACK for every received packet
+
+\* Delivers packets in correct order
+
+
+Example:
+
+\`\`\`
+
+Sending packet 0
+
+Sending packet 1
+
+Sending packet 2
+
+Sending packet 3
+
+
+Timeout packet 1
+
+Resending packet 1
+
+
+ACK received 1
+
+\`\`\`
 
 ---
 
@@ -647,66 +819,4 @@ Received DATA 0
 Duplicate packet 0 ignored
 
 ACK sent
-```
-
----
-
-# Current Limitations
-
-Not implemented yet:
-
-* Go-Back-N
-* Selective Repeat
-* Automated experiments
-* Performance graphs
-
----
-
-# Next Phase
-
-## Phase 6 — Go-Back-N Sliding Window Protocol
-
-Goal:
-
-Replace Stop-and-Wait with a sliding window mechanism.
-
-Current:
-
-```
-Send packet
-Wait ACK
-Send next packet
-```
-
-Target:
-
-```
-Window size = N
-
-Send:
-
-[0][1][2][3]
-
-Receive ACKs
-
-Slide window forward
-```
-
-Required implementation:
-
-```
-algorithms/
-
-└── go_back_n.py
-```
-
-Concepts:
-
-* Sliding window
-* Cumulative ACK
-* Sequence number management
-* Timeout recovery
-* Window movement
-
-```
 ```
