@@ -4,7 +4,8 @@ import sys
 from protocol.packet import Packet, DATA, END
 # from algorithms.stop_wait import send_file
 from algorithms.stop_wait import send_packet
-from algorithms.go_back_n import send_file
+# from algorithms.go_back_n import send_file
+from algorithms.selective_repeat import send_file
 
 SERVER_IP = "127.0.0.1"
 SERVER_PORT = 5001

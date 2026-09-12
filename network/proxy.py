@@ -16,10 +16,10 @@ BUFFER_SIZE = 1024
 
 
 data_injector = FaultInjector(
-    loss_rate=0.1,
+    loss_rate=0.2,
     corruption_rate=0.5,
     delay=0.1,
-    duplicate_rate=0.1
+    duplicate_rate=0.0
 )
 
 
@@ -49,9 +49,14 @@ sender_address = None
 
 while True:
 
-    data, address = sock.recvfrom(
-        BUFFER_SIZE
-    )
+    try:
+        data, address = sock.recvfrom(
+            BUFFER_SIZE
+        )
+
+    except ConnectionResetError:
+        print("Connection reset. Waiting for next packet...")
+        continue
 
     try:
         packet = Packet.decode(data)

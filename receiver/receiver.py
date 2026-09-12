@@ -5,7 +5,7 @@ HOST = "0.0.0.0"
 PORT = 5000
 BUFFER_SIZE = 1024
 OUTPUT_FILE = "data/results/received.txt"
-
+WINDOW_SIZE = 4
 
 sock = socket.socket(
     socket.AF_INET,
@@ -13,6 +13,8 @@ sock = socket.socket(
 )
 
 sock.bind((HOST, PORT))
+
+receive_buffer = {}
 
 print(f"Listening on UDP port {PORT}...")
 
@@ -52,38 +54,71 @@ with open(OUTPUT_FILE, "wb") as file:
 
         if packet.packet_type == DATA:
 
-            print(
-                f"Received DATA {packet.sequence}, "
-                f"{len(packet.payload)} bytes"
-            )
+            seq = packet.sequence
 
-            if packet.sequence == expected_sequence:
 
-                file.write(packet.payload)
+            # Packet inside receiver window
+            if (
+                expected_sequence  <= seq < expected_sequence  + WINDOW_SIZE
+            ):
 
-                expected_sequence += 1
+                # Store only first copy
+                if seq not in receive_buffer:
 
-                ack_number = packet.sequence
+                    receive_buffer[seq] = packet.payload
 
-            else:
-                print(
-                    f"Out of order/duplicate packet {packet.sequence}, ignoring data"
+                    print(
+                        f"Buffered packet {seq}"
+                    )
+
+                else:
+                    print(
+                        f"Duplicate packet {seq}"
+                    )
+
+
+                # Send ACK for this packet
+                ack = Packet(
+                    seq,
+                    ACK,
+                    b""
                 )
 
-                ack_number = max(0, expected_sequence - 1)
+                sock.sendto(
+                    ack.encode(),
+                    address
+                )
 
 
-            ack = Packet(
-                ack_number,
-                ACK,
-                b""
-            )
+                # Deliver consecutive packets
+                while expected_sequence  in receive_buffer:
 
-            sock.sendto(
-                ack.encode(),
-                address
-            )
+                    data = receive_buffer.pop(
+                        expected_sequence 
+                    )
 
+                    file.write(data)
+
+                    print(
+                        f"Wrote packet {expected_sequence}"
+                    )
+
+                    expected_sequence += 1
+
+
+            else:
+
+                # Old packet, resend ACK
+                ack = Packet(
+                    seq,
+                    ACK,
+                    b""
+                )
+
+                sock.sendto(
+                    ack.encode(),
+                    address
+                )
 
 sock.close()
 
