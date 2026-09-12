@@ -63,14 +63,18 @@ with open(OUTPUT_FILE, "wb") as file:
 
                 expected_sequence += 1
 
+                ack_number = packet.sequence
+
             else:
                 print(
-                    f"Duplicate packet {packet.sequence}, ignoring data"
+                    f"Out of order/duplicate packet {packet.sequence}, ignoring data"
                 )
+
+                ack_number = max(0, expected_sequence - 1)
 
 
             ack = Packet(
-                packet.sequence,
+                ack_number,
                 ACK,
                 b""
             )

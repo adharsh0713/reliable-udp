@@ -3,7 +3,6 @@ import socket
 from network.fault_injector import FaultInjector
 from protocol.packet import Packet, DATA, ACK, END
 
-SHUTDOWN_AFTER_TRANSFER = True
 
 PROXY_IP = "0.0.0.0"
 PROXY_PORT = 5001
@@ -17,10 +16,10 @@ BUFFER_SIZE = 1024
 
 
 data_injector = FaultInjector(
-    loss_rate=0.0,
-    corruption_rate=0.0,
-    delay=0.0,
-    duplicate_rate=0.5
+    loss_rate=0.1,
+    corruption_rate=0.5,
+    delay=0.1,
+    duplicate_rate=0.1
 )
 
 
@@ -41,84 +40,87 @@ sock.bind(
     (PROXY_IP, PROXY_PORT)
 )
 
+
 print("Proxy listening on port 5001")
+
+
+sender_address = None
 
 
 while True:
 
-    data, sender_address = sock.recvfrom(
+    data, address = sock.recvfrom(
         BUFFER_SIZE
     )
 
-    packet = Packet.decode(data)
+    try:
+        packet = Packet.decode(data)
+
+    except ValueError:
+        print("Proxy discarded corrupted packet")
+        continue
+
 
     print(
         f"Proxy received type={packet.packet_type}, seq={packet.sequence}"
     )
 
-    if packet.packet_type == DATA:
 
-        modified = data_injector.process_packet_with_duplicate(data)
+    # Sender -> Receiver direction
+    if packet.packet_type in (DATA, END):
 
-    else:
+        sender_address = address
 
-        modified = data_injector.process_packet(data)
-
-
-    if modified is None:
-        print("Packet dropped")
-        continue
-
-
-    if isinstance(modified, tuple):
-
-        print("Sending duplicate packet")
-
-        sock.sendto(
-            modified[0],
-            RECEIVER_ADDRESS
-        )
-
-        sock.sendto(
-            modified[1],
-            RECEIVER_ADDRESS
-        )
-
-    else:
-
-        sock.sendto(
-            modified,
-            RECEIVER_ADDRESS
+        modified = data_injector.process_packet_with_duplicate(
+            data
         )
 
 
-    if packet.packet_type == DATA or packet.packet_type == END:
+        if modified is None:
+            print("DATA packet dropped")
+            continue
 
-        ack, _ = sock.recvfrom(
-            BUFFER_SIZE
+
+        if isinstance(modified, tuple):
+
+            print("Sending duplicate packet")
+
+            sock.sendto(
+                modified[0],
+                RECEIVER_ADDRESS
+            )
+
+            sock.sendto(
+                modified[1],
+                RECEIVER_ADDRESS
+            )
+
+        else:
+
+            sock.sendto(
+                modified,
+                RECEIVER_ADDRESS
+            )
+
+
+    # Receiver -> Sender direction
+    elif packet.packet_type == ACK:
+
+        if sender_address is None:
+            continue
+
+
+        modified = ack_injector.process_packet(
+            data
         )
 
-        print("ACK received from receiver")
 
-
-        modified_ack = ack_injector.process_packet(ack)
-
-
-        if modified_ack is None:
+        if modified is None:
             print("ACK dropped")
             continue
 
 
         sock.sendto(
-            modified_ack,
+            modified,
             sender_address
         )
-
-
-    if packet.packet_type == END:
-
-        print("END forwarded")
-
-        if SHUTDOWN_AFTER_TRANSFER:
-            print("Test transfer complete. Proxy shutting down.")
-            break

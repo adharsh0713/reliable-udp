@@ -4,6 +4,9 @@ from protocol.timer import Timer
 TIMEOUT = 1
 MAX_TRIES = 5
 
+def send_file(sock, address, packets):
+    for packet in packets:
+        send_packet(sock, address, packet)
 
 def send_packet(sock, address, packet):
 

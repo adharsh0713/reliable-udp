@@ -2,7 +2,9 @@ import socket
 import sys
 
 from protocol.packet import Packet, DATA, END
+# from algorithms.stop_wait import send_file
 from algorithms.stop_wait import send_packet
+from algorithms.go_back_n import send_file
 
 SERVER_IP = "127.0.0.1"
 SERVER_PORT = 5001
@@ -20,6 +22,8 @@ if len(sys.argv) != 2:
 
 filename = sys.argv[1]
 
+packets = []
+
 sequence = 0
 
 with open(filename, "rb") as file:
@@ -31,19 +35,22 @@ with open(filename, "rb") as file:
         if not data:
             break
 
-        packet = Packet(
-            sequence=sequence,
-            packet_type=DATA,
-            payload=data
-        )
-
-        send_packet(
-            sock,
-            (SERVER_IP, SERVER_PORT),
-            packet
+        packets.append(
+            Packet(
+                sequence,
+                DATA,
+                data
+            )
         )
 
         sequence += 1
+
+
+send_file(
+    sock,
+    (SERVER_IP, SERVER_PORT),
+    packets
+)
 
 end_packet = Packet(
     sequence,
