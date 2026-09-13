@@ -820,3 +820,44 @@ Duplicate packet 0 ignored
 
 ACK sent
 ```
+
+## Experimental Evaluation
+
+The reliability protocols were evaluated under different packet loss conditions.
+
+### Experimental Setup
+
+| Parameter | Value |
+|---|---|
+| Protocols | Stop-and-Wait, Go-Back-N, Selective Repeat |
+| Packet Loss Rates | 0%, 20% |
+| Runs per Configuration | 3 |
+| Metrics | Completion Time, Throughput, Retransmissions |
+
+The following metrics were collected automatically during experiments.
+
+---
+
+## Preliminary Results
+
+### Completion Time vs Packet Loss
+
+As packet loss increases, completion time increases because protocols require retransmissions.
+
+![Completion Time vs Loss](docs/graphs/completion_vs_loss.png)
+
+---
+
+### Retransmissions vs Packet Loss
+
+Higher packet loss causes more retransmissions. Selective Repeat generally retransmits fewer unnecessary packets compared to Go-Back-N.
+
+![Retransmissions vs Loss](docs/graphs/retransmissions_vs_loss.png)
+
+---
+
+### Throughput vs Packet Loss
+
+Throughput decreases as packet loss increases due to additional retransmission overhead.
+
+![Throughput vs Loss](docs/graphs/throughput_vs_loss.png)
