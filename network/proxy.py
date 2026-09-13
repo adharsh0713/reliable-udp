@@ -16,10 +16,10 @@ BUFFER_SIZE = 1024
 
 
 data_injector = FaultInjector(
-    loss_rate=0.1,
-    corruption_rate=0.4,
-    delay=0.1,
-    duplicate_rate=0.0
+    loss_rate=0.2,
+    corruption_rate=0.2,
+    delay=0.2,
+    duplicate_rate=0.2
 )
 
 

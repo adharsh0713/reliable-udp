@@ -1,9 +1,12 @@
 import socket
 import sys
+import os
 
 from protocol.packet import Packet, DATA, END
 from protocol.control import send_control_packet
 from algorithms.selector import get_protocol
+from experiments.metrics import Metrics
+
 from config import (
     PROTOCOL,
     CHUNK_SIZE,
@@ -23,6 +26,8 @@ if len(sys.argv) != 2:
     sys.exit(1)
 
 filename = sys.argv[1]
+
+file_size = os.path.getsize(filename)
 
 packets = []
 
@@ -48,12 +53,21 @@ with open(filename, "rb") as file:
 
         sequence += 1
 
+# Create metrics object
+metrics = Metrics(PROTOCOL)
+
+# Start measuring transfer
+metrics.start_timer()
 
 send_file(
     sock,
     (SERVER_IP, SERVER_PORT),
-    packets
+    packets,
+    metrics
 )
+
+# Stop measuring transfer
+metrics.stop_timer()
 
 end_packet = Packet(
     sequence,
@@ -68,5 +82,11 @@ send_control_packet(
 )
 
 sock.close()
+
+print(
+    metrics.report(
+        file_size
+    )
+)
 
 print("File sent")

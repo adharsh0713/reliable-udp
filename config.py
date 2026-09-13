@@ -1,7 +1,7 @@
-PROTOCOL = "go_back_n"
+PROTOCOL = "stop_wait"
 
 WINDOW_SIZE = 4
-CHUNK_SIZE = 20
+CHUNK_SIZE = 128
 
 SERVER_IP = "127.0.0.1"
 SERVER_PORT = 5001

@@ -2,6 +2,9 @@ import socket
 
 from protocol.packet import Packet, DATA, ACK, END
 from config import PROTOCOL, WINDOW_SIZE
+from experiments.metrics import Metrics
+
+metrics = Metrics(PROTOCOL)
 
 SUPPORTED = [
     "stop_wait",
@@ -200,6 +203,8 @@ with open(OUTPUT_FILE, "wb") as file:
                     seq,
                     address
                 )
+
+                metrics.packet_received()
 
                 expected_sequence += 1
 
