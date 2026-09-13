@@ -3,7 +3,7 @@ from protocol.packet import Packet, ACK
 import socket
 from config import TIMEOUT, WINDOW_SIZE, MAX_RETRIES
 
-def send_file(sock, address, packets):
+def send_file(sock, address, packets, metrics):
 
     base = 0
     next_seq = 0
@@ -29,6 +29,8 @@ def send_file(sock, address, packets):
                 address
             )
 
+            metrics.data_packet_sent()
+
             print(
                 f"Sending packet {next_seq}"
             )
@@ -45,9 +47,16 @@ def send_file(sock, address, packets):
         sock.settimeout(0.1)
 
         try:
-            data, _ = sock.recvfrom(1024)
+            data, _ = sock.recvfrom(65535)
 
-            ack_packet = Packet.decode(data)
+            try:
+                ack_packet = Packet.decode(data)
+
+            except ValueError:
+                print("Corrupted ACK discarded")
+                continue
+
+            metrics.ack_received()
 
             ack_no = ack_packet.sequence
 
@@ -92,6 +101,8 @@ def send_file(sock, address, packets):
                     f"Timeout packet {seq}"
                 )
 
+                metrics.retransmission()
+                metrics.data_packet_sent()
 
                 sock.sendto(
                     packets[seq].encode(),

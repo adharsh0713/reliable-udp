@@ -1,8 +1,65 @@
 import socket
+import os
 
 from network.fault_injector import FaultInjector
 from protocol.packet import Packet, DATA, ACK, END
 
+DATA_LOSS_RATE = float(
+    os.getenv(
+        "DATA_LOSS_RATE",
+        0
+    )
+)
+
+DATA_CORRUPTION_RATE = float(
+    os.getenv(
+        "DATA_CORRUPTION_RATE",
+        0
+    )
+)
+
+DATA_DELAY = float(
+    os.getenv(
+        "DATA_DELAY",
+        0
+    )
+)
+
+DATA_DUPLICATE_RATE = float(
+    os.getenv(
+        "DATA_DUPLICATE_RATE",
+        0
+    )
+)
+
+
+ACK_LOSS_RATE = float(
+    os.getenv(
+        "ACK_LOSS_RATE",
+        0
+    )
+)
+
+ACK_CORRUPTION_RATE = float(
+    os.getenv(
+        "ACK_CORRUPTION_RATE",
+        0
+    )
+)
+
+ACK_DELAY = float(
+    os.getenv(
+        "ACK_DELAY",
+        0
+    )
+)
+
+ACK_DUPLICATE_RATE = float(
+    os.getenv(
+        "ACK_DUPLICATE_RATE",
+        0
+    )
+)
 
 PROXY_IP = "0.0.0.0"
 PROXY_PORT = 5001
@@ -12,28 +69,34 @@ RECEIVER_ADDRESS = (
     5000
 )
 
-BUFFER_SIZE = 1024
+BUFFER_SIZE = 65535
 
 
 data_injector = FaultInjector(
-    loss_rate=0.2,
-    corruption_rate=0.2,
-    delay=0.2,
-    duplicate_rate=0.2
+    loss_rate=DATA_LOSS_RATE,
+    corruption_rate=DATA_CORRUPTION_RATE,
+    delay=DATA_DELAY,
+    duplicate_rate=DATA_DUPLICATE_RATE
 )
 
 
 ack_injector = FaultInjector(
-    loss_rate=0.0,
-    corruption_rate=0.0,
-    delay=0.0,
-    duplicate_rate=0.0
+    loss_rate=ACK_LOSS_RATE,
+    corruption_rate=ACK_CORRUPTION_RATE,
+    delay=ACK_DELAY,
+    duplicate_rate=ACK_DUPLICATE_RATE
 )
 
 
 sock = socket.socket(
     socket.AF_INET,
     socket.SOCK_DGRAM
+)
+
+sock.setsockopt(
+    socket.SOL_SOCKET,
+    socket.SO_REUSEADDR,
+    1
 )
 
 sock.bind(

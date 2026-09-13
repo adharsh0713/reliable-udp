@@ -37,7 +37,7 @@ def send_packet(sock, address, packet, metrics):
         sock.settimeout(TIMEOUT)
 
         try:
-            data, _ = sock.recvfrom(1024)
+            data, _ = sock.recvfrom(65535)
 
             try:
                 ack = Packet.decode(data)

@@ -1,10 +1,30 @@
 import socket
+import os
 
 from protocol.packet import Packet, DATA, ACK, END
-from config import PROTOCOL, WINDOW_SIZE
 from experiments.metrics import Metrics
 
+
+PROTOCOL = os.getenv(
+    "PROTOCOL",
+    "stop_wait"
+)
+
+WINDOW_SIZE = int(
+    os.getenv(
+        "WINDOW_SIZE",
+        "4"
+    )
+)
+
+OUTPUT_FILE = os.getenv(
+    "OUTPUT_FILE",
+    f"data/results/{PROTOCOL}_received.txt"
+)
+
+
 metrics = Metrics(PROTOCOL)
+
 
 SUPPORTED = [
     "stop_wait",
@@ -12,30 +32,51 @@ SUPPORTED = [
     "selective_repeat"
 ]
 
+
 HOST = "0.0.0.0"
 PORT = 5000
-BUFFER_SIZE = 1024
-OUTPUT_FILE = f"data/results/{PROTOCOL}_received.txt"
+BUFFER_SIZE = 65535
+
 
 sock = socket.socket(
     socket.AF_INET,
     socket.SOCK_DGRAM
 )
 
-sock.bind((HOST, PORT))
+sock.setsockopt(
+    socket.SOL_SOCKET,
+    socket.SO_REUSEADDR,
+    1
+)
+
+sock.bind(
+    (HOST, PORT)
+)
 
 
-# Used by Selective Repeat to store out-of-order packets
 receive_buffer = {}
-
 expected_sequence = 0
 
 
-print(f"Listening on UDP port {PORT}...")
-print(f"Protocol: {PROTOCOL}")
+print(
+    f"Listening on UDP port {PORT}..."
+)
+
+print(
+    f"Protocol: {PROTOCOL}"
+)
+
+print(
+    f"Window: {WINDOW_SIZE}"
+)
+
+print(
+    f"Output: {OUTPUT_FILE}"
+)
 
 
 def send_ack(sequence, address):
+
     ack = Packet(
         sequence,
         ACK,
@@ -47,24 +88,46 @@ def send_ack(sequence, address):
         address
     )
 
+    metrics.ack_sent()
 
-with open(OUTPUT_FILE, "wb") as file:
+
+os.makedirs(
+    os.path.dirname(OUTPUT_FILE),
+    exist_ok=True
+)
+
+
+with open(
+    OUTPUT_FILE,
+    "wb"
+) as file:
 
     while True:
 
-        data, address = sock.recvfrom(BUFFER_SIZE)
+        data, address = sock.recvfrom(
+            BUFFER_SIZE
+        )
 
         try:
+
             packet = Packet.decode(data)
 
         except ValueError:
-            print("Corrupted packet discarded (CRC mismatch)")
+
+            print(
+                "Corrupted packet discarded (CRC mismatch)"
+            )
+
             continue
+
+
+        if packet.packet_type == DATA:
+
+            metrics.packet_received()
 
 
         if packet.packet_type == END:
 
-            # Do not close before buffered SR packets are written
             if not receive_buffer:
 
                 send_ack(
@@ -76,6 +139,13 @@ with open(OUTPUT_FILE, "wb") as file:
                     f"Sent ACK {packet.sequence}"
                 )
 
+                file.flush()
+
+                metrics.save_json(
+                    "data/results/receiver_metrics.json",
+                    os.path.getsize(OUTPUT_FILE)
+                )
+
                 break
 
 
@@ -85,14 +155,18 @@ with open(OUTPUT_FILE, "wb") as file:
 
         seq = packet.sequence
 
+
         if PROTOCOL not in SUPPORTED:
+
             raise ValueError(
                 f"Unsupported protocol: {PROTOCOL}"
             )
 
+
         # ----------------------------
         # Selective Repeat receiver
         # ----------------------------
+
         if PROTOCOL == "selective_repeat":
 
             if (
@@ -109,26 +183,27 @@ with open(OUTPUT_FILE, "wb") as file:
                     )
 
                 else:
+
                     print(
                         f"Duplicate packet {seq}"
                     )
 
 
-                # Individual ACK
                 send_ack(
                     seq,
                     address
                 )
 
 
-                # Deliver packets in order
                 while expected_sequence in receive_buffer:
 
                     payload = receive_buffer.pop(
                         expected_sequence
                     )
 
-                    file.write(payload)
+                    file.write(
+                        payload
+                    )
 
                     print(
                         f"Wrote packet {expected_sequence}"
@@ -139,7 +214,6 @@ with open(OUTPUT_FILE, "wb") as file:
 
             else:
 
-                # Old packet, resend ACK
                 send_ack(
                     seq,
                     address
@@ -149,6 +223,7 @@ with open(OUTPUT_FILE, "wb") as file:
         # ----------------------------
         # Go-Back-N receiver
         # ----------------------------
+
         elif PROTOCOL == "go_back_n":
 
             if seq == expected_sequence:
@@ -168,14 +243,13 @@ with open(OUTPUT_FILE, "wb") as file:
 
                 expected_sequence += 1
 
-
             else:
 
-                # Reject future packets
-                # Send ACK for last correctly received packet
                 if expected_sequence > 0:
+
                     print(
-                        f"Out of order packet {seq}, expected {expected_sequence}"
+                        f"Out of order packet {seq}, "
+                        f"expected {expected_sequence}"
                     )
 
                     send_ack(
@@ -187,6 +261,7 @@ with open(OUTPUT_FILE, "wb") as file:
         # ----------------------------
         # Stop-and-Wait receiver
         # ----------------------------
+
         elif PROTOCOL == "stop_wait":
 
             if seq == expected_sequence:
@@ -204,13 +279,10 @@ with open(OUTPUT_FILE, "wb") as file:
                     address
                 )
 
-                metrics.packet_received()
-
                 expected_sequence += 1
 
             else:
 
-                # Duplicate packet after timeout
                 send_ack(
                     seq,
                     address
@@ -218,6 +290,7 @@ with open(OUTPUT_FILE, "wb") as file:
 
 
 sock.close()
+
 
 print(
     f"File received: {OUTPUT_FILE}"

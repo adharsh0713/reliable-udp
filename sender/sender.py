@@ -1,92 +1,104 @@
 import socket
-import sys
 import os
+import config
+import sys
 
 from protocol.packet import Packet, DATA, END
 from protocol.control import send_control_packet
 from algorithms.selector import get_protocol
 from experiments.metrics import Metrics
 
-from config import (
-    PROTOCOL,
-    CHUNK_SIZE,
-    SERVER_IP,
-    SERVER_PORT
-)
 
-send_file = get_protocol(PROTOCOL)
+def send_file(filename):
 
-sock = socket.socket(
-    socket.AF_INET,
-    socket.SOCK_DGRAM
-)
+    send_protocol = get_protocol(config.PROTOCOL)
 
-if len(sys.argv) != 2:
-    print("Usage: python sender/sender.py <file>")
-    sys.exit(1)
+    sock = socket.socket(
+        socket.AF_INET,
+        socket.SOCK_DGRAM
+    )
 
-filename = sys.argv[1]
+    file_size = os.path.getsize(filename)
 
-file_size = os.path.getsize(filename)
+    packets = []
 
-packets = []
+    sequence = 0
 
-sequence = 0
+    with open(filename, "rb") as file:
 
-with open(filename, "rb") as file:
+        while True:
 
-    while True:
-        # Split file into fixed-size payload chunks
-        # Each chunk becomes an independent protocol packet
-        data = file.read(CHUNK_SIZE)
+            data = file.read(config.CHUNK_SIZE)
 
-        if not data:
-            break
+            if not data:
+                break
 
-        packets.append(
-            Packet(
-                sequence,
-                DATA,
-                data
+            packets.append(
+                Packet(
+                    sequence,
+                    DATA,
+                    data
+                )
             )
-        )
 
-        sequence += 1
+            sequence += 1
 
-# Create metrics object
-metrics = Metrics(PROTOCOL)
 
-# Start measuring transfer
-metrics.start_timer()
+    metrics = Metrics(config.PROTOCOL)
 
-send_file(
-    sock,
-    (SERVER_IP, SERVER_PORT),
-    packets,
-    metrics
-)
+    metrics.start_timer()
 
-# Stop measuring transfer
-metrics.stop_timer()
 
-end_packet = Packet(
-    sequence,
-    END,
-    b""
-)
+    send_protocol(
+        sock,
+        (config.SERVER_IP, config.SERVER_PORT),
+        packets,
+        metrics
+    )
 
-send_control_packet(
-    sock,
-    (SERVER_IP, SERVER_PORT),
-    end_packet
-)
 
-sock.close()
+    end_packet = Packet(
+        sequence,
+        END,
+        b""
+    )
 
-print(
-    metrics.report(
+
+    send_control_packet(
+        sock,
+        (config.SERVER_IP, config.SERVER_PORT),
+        end_packet,
+        metrics
+    )
+
+
+    metrics.stop_timer()
+
+
+    metrics.save_json(
+        "data/results/sender_metrics.json",
         file_size
     )
-)
 
-print("File sent")
+    sock.close()
+    return metrics.report(file_size)
+
+
+
+if __name__ == "__main__":
+
+    if len(sys.argv) != 2:
+        print(
+            "Usage: python -m sender.sender <file>"
+        )
+        exit(1)
+
+
+    result = send_file(
+        sys.argv[1]
+    )
+
+
+    print(result)
+
+    print("File sent")

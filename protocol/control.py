@@ -1,19 +1,19 @@
 import socket
 
 from protocol.packet import Packet, ACK
-
-MAX_TRIES = 5
-TIMEOUT = 2
+from config import MAX_RETRIES, TIMEOUT
 
 
-def send_control_packet(sock, address, packet):
+def send_control_packet(sock, address, packet, metrics):
 
-    for attempt in range(MAX_TRIES):
+    for attempt in range(MAX_RETRIES):
 
         sock.sendto(
             packet.encode(),
             address
         )
+
+        metrics.control_packet_sent()
 
         print(
             f"Sending control packet {packet.sequence}"
@@ -22,7 +22,7 @@ def send_control_packet(sock, address, packet):
         sock.settimeout(TIMEOUT)
 
         try:
-            data, _ = sock.recvfrom(1024)
+            data, _ = sock.recvfrom(65535)
 
             ack = Packet.decode(data)
 
