@@ -3,24 +3,11 @@ import os
 
 from protocol.packet import Packet, DATA, ACK, END
 from experiments.metrics import Metrics
+import config
 
-
-PROTOCOL = os.getenv(
-    "PROTOCOL",
-    "stop_wait"
-)
-
-WINDOW_SIZE = int(
-    os.getenv(
-        "WINDOW_SIZE",
-        "4"
-    )
-)
-
-OUTPUT_FILE = os.getenv(
-    "OUTPUT_FILE",
-    f"data/results/{PROTOCOL}_received.txt"
-)
+PROTOCOL = config.PROTOCOL
+WINDOW_SIZE = config.WINDOW_SIZE
+OUTPUT_FILE = config.OUTPUT_FILE
 
 
 metrics = Metrics(PROTOCOL)
