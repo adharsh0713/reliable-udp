@@ -1,28 +1,42 @@
-# Python cache
+# Python bytecode and test caches
 __pycache__/
 *.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
 
-# Virtual environment
+# Virtual environments
 venv/
 .venv/
 env/
 
-# VS Code
+# Editors and operating-system files
 .vscode/
-
-# Test outputs
-data/results/*
-data/test_results/*
-received.txt
-
-# Logs
-*.log
-
-# OS files
+.idea/
 .DS_Store
 Thumbs.db
 
-# Python build files
+# Build artifacts
 build/
 dist/
 *.egg-info/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*.url
+
+# Generated transfer outputs and runtime metrics
+data/results/received/
+data/results/sender_metrics.json
+data/results/receiver_metrics.json
+
+# Generated analysis plots live here; commit selected published copies in docs/graphs/
+data/results/graphs/
+
+# Keep these reproducibility artifacts trackable:
+# data/results/experiment_results.csv
+# data/results/aggregated_results.csv
+
+data/results/*_received.txt

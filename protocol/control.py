@@ -5,46 +5,49 @@ from config import MAX_RETRIES, TIMEOUT
 
 
 def send_control_packet(sock, address, packet, metrics):
+    try:
+        for attempt in range(MAX_RETRIES):
+            sock.sendto(packet.encode(), address)
+            metrics.control_packet_sent()
 
-    for attempt in range(MAX_RETRIES):
+            print(
+                f"Sending control packet {packet.sequence} "
+                f"(attempt {attempt + 1}/{MAX_RETRIES})"
+            )
 
-        sock.sendto(
-            packet.encode(),
-            address
-        )
+            sock.settimeout(TIMEOUT)
 
-        metrics.control_packet_sent()
+            while True:
+                try:
+                    data, source = sock.recvfrom(65535)
+                except socket.timeout:
+                    break
+                except ConnectionResetError:
+                    break
 
-        print(
-            f"Sending control packet {packet.sequence}"
-        )
+                if source != address:
+                    continue
 
-        sock.settimeout(TIMEOUT)
+                try:
+                    ack = Packet.decode(data)
+                except ValueError:
+                    print("Invalid ACK packet discarded")
+                    continue
 
-        try:
-            data, _ = sock.recvfrom(65535)
+                if ack.packet_type != ACK:
+                    continue
 
-            ack = Packet.decode(data)
+                if ack.sequence != packet.sequence:
+                    continue
 
-            if (
-                ack.packet_type == ACK
-                and ack.sequence == packet.sequence
-            ):
-                print(
-                    f"ACK received {ack.sequence}"
-                )
+                metrics.ack_received()
+                print(f"ACK received {ack.sequence}")
                 return
 
-        except socket.timeout:
-            pass
+        raise TimeoutError(
+            f"Control packet {packet.sequence} failed "
+            f"after {MAX_RETRIES} attempts"
+        )
 
-        except ValueError:
-            print("Invalid ACK packet")
-
-        except Exception:
-            pass
-
-
-    raise TimeoutError(
-        f"Control packet {packet.sequence} failed"
-    )
+    finally:
+        sock.settimeout(None)

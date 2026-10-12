@@ -1,5 +1,6 @@
 import socket
 import os
+import time
 
 from protocol.packet import Packet, DATA, ACK, END
 from experiments.metrics import Metrics
@@ -8,7 +9,7 @@ import config
 PROTOCOL = config.PROTOCOL
 WINDOW_SIZE = config.WINDOW_SIZE
 OUTPUT_FILE = config.OUTPUT_FILE
-
+END_ACK_WAIT = 3.0
 
 metrics = Metrics(PROTOCOL)
 
@@ -114,27 +115,59 @@ with open(
 
 
         if packet.packet_type == END:
+            transfer_complete = (
+                packet.sequence == expected_sequence
+                and not receive_buffer
+            )
 
-            if not receive_buffer:
-
-                send_ack(
-                    packet.sequence,
-                    address
-                )
-
+            if not transfer_complete:
                 print(
-                    f"Sent ACK {packet.sequence}"
+                    f"Premature END rejected: received sequence "
+                    f"{packet.sequence}, expected {expected_sequence}"
+                )
+                continue
+
+            send_ack(packet.sequence, address)
+            print(f"Sent END ACK {packet.sequence}")
+
+            file.flush()
+
+            metrics.save_json(
+                "data/results/receiver_metrics.json",
+                os.path.getsize(OUTPUT_FILE)
+            )
+
+            deadline = time.monotonic() + END_ACK_WAIT
+
+            while time.monotonic() < deadline:
+                sock.settimeout(
+                    max(0.01, deadline - time.monotonic())
                 )
 
-                file.flush()
+                try:
+                    retry_data, retry_address = sock.recvfrom(BUFFER_SIZE)
+                except socket.timeout:
+                    break
 
-                metrics.save_json(
-                    "data/results/receiver_metrics.json",
-                    os.path.getsize(OUTPUT_FILE)
-                )
+                try:
+                    retry_packet = Packet.decode(retry_data)
+                except ValueError:
+                    continue
 
-                break
+                if (
+                    retry_packet.packet_type == END
+                    and retry_packet.sequence == expected_sequence
+                ):
+                    send_ack(
+                        retry_packet.sequence,
+                        retry_address
+                    )
+                    print(
+                        f"Re-acknowledged END {retry_packet.sequence}"
+                    )
 
+            sock.settimeout(None)
+            break
 
         if packet.packet_type != DATA:
             continue

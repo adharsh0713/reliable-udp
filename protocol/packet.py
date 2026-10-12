@@ -77,8 +77,13 @@ class Packet:
             raise ValueError("Invalid packet type")
 
 
-        if len(data) < Packet.HEADER_SIZE + length:
+        expected_length = Packet.HEADER_SIZE + length
+
+        if len(data) < expected_length:
             raise ValueError("Incomplete packet")
+
+        if len(data) > expected_length:
+            raise ValueError("Unexpected trailing bytes")
 
 
         payload = data[
