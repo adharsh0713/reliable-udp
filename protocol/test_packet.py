@@ -1,27 +1,84 @@
-from protocol.packet import Packet, DATA
+import pytest
+
+from protocol.packet import Packet, DATA, ACK, END
 
 
-packet = Packet(
-    1,
-    DATA,
-    b"hello"
+@pytest.mark.parametrize(
+    "packet_type,payload",
+    [
+        (DATA, b"Hello, world!"),
+        (ACK, b""),
+        (END, b""),
+        (DATA, bytes(range(256))),
+    ],
 )
+def test_packet_encode_decode_round_trip(packet_type, payload):
+    original = Packet(
+        sequence=7,
+        packet_type=packet_type,
+        payload=payload,
+    )
 
-encoded = packet.encode()
+    decoded = Packet.decode(original.encode())
 
-print("Original:")
-print(Packet.decode(encoded))
+    assert decoded.sequence == original.sequence
+    assert decoded.packet_type == original.packet_type
+    assert decoded.payload == original.payload
 
 
-print("\nCorruption test:")
+def test_decode_rejects_packet_smaller_than_header():
+    with pytest.raises(ValueError, match="Packet too small"):
+        Packet.decode(b"\x00")
 
-corrupted = bytearray(encoded)
 
-corrupted[0] ^= 1
+def test_decode_rejects_incomplete_payload():
+    packet = Packet(
+        sequence=1,
+        packet_type=DATA,
+        payload=b"hello",
+    ).encode()
 
-try:
-    Packet.decode(bytes(corrupted))
-    print("ERROR: corruption was not detected")
+    with pytest.raises(ValueError, match="Incomplete packet"):
+        Packet.decode(packet[:-1])
 
-except ValueError as e:
-    print(e)
+
+def test_decode_rejects_trailing_bytes():
+    packet = Packet(
+        sequence=1,
+        packet_type=DATA,
+        payload=b"hello",
+    ).encode()
+
+    with pytest.raises(ValueError, match="Unexpected trailing bytes"):
+        Packet.decode(packet + b"\x00")
+
+
+def test_decode_rejects_corrupted_payload():
+    packet = bytearray(
+        Packet(
+            sequence=1,
+            packet_type=DATA,
+            payload=b"hello",
+        ).encode()
+    )
+
+    packet[-1] ^= 0x01
+
+    with pytest.raises(ValueError, match="CRC mismatch"):
+        Packet.decode(bytes(packet))
+
+
+def test_decode_rejects_invalid_packet_type():
+    packet = bytearray(
+        Packet(
+            sequence=1,
+            packet_type=DATA,
+            payload=b"hello",
+        ).encode()
+    )
+
+    # Header format is !IBHI: packet type is byte index 4.
+    packet[4] = 99
+
+    with pytest.raises(ValueError, match="Invalid packet type"):
+        Packet.decode(bytes(packet))

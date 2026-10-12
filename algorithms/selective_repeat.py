@@ -1,119 +1,109 @@
+import socket
+
 from protocol.timer import Timer
 from protocol.packet import Packet, ACK
-import socket
 from config import TIMEOUT, WINDOW_SIZE, MAX_RETRIES
 
-def send_file(sock, address, packets, metrics):
 
+def send_file(sock, address, packets, metrics):
     base = 0
     next_seq = 0
-
     total = len(packets)
 
     timers = {}
     retries = {}
     acked = {}
 
-    while base < total:
+    try:
+        while base < total:
+            # Send new packets that fit inside the current window.
+            while (
+                next_seq < total
+                and next_seq < base + WINDOW_SIZE
+            ):
+                packet = packets[next_seq]
+                seq = packet.sequence
 
-        # Send packets inside window
-        while (
-            next_seq < total and
-            next_seq < base + WINDOW_SIZE
-        ):
+                sock.sendto(packet.encode(), address)
+                metrics.data_packet_sent()
 
-            packet = packets[next_seq]
+                print(f"Sending packet {seq}")
 
-            sock.sendto(
-                packet.encode(),
-                address
-            )
+                timers[seq] = Timer(TIMEOUT)
+                timers[seq].start()
 
-            metrics.data_packet_sent()
+                retries[seq] = 0
+                acked[seq] = False
 
-            print(
-                f"Sending packet {next_seq}"
-            )
+                next_seq += 1
 
-            timers[next_seq] = Timer(TIMEOUT)
-            timers[next_seq].start()
-
-            retries[next_seq] = 0
-            acked[next_seq] = False
-
-            next_seq += 1
-
-
-        sock.settimeout(0.1)
-
-        try:
-            data, _ = sock.recvfrom(65535)
+            # Wait briefly for ACKs, then check each outstanding timer.
+            sock.settimeout(0.1)
 
             try:
-                ack_packet = Packet.decode(data)
+                data, source = sock.recvfrom(65535)
 
-            except ValueError:
-                print("Corrupted ACK discarded")
-                continue
+                if source != address:
+                    continue
 
-            metrics.ack_received()
+                try:
+                    ack_packet = Packet.decode(data)
+                except ValueError:
+                    print("Invalid ACK packet discarded")
+                    continue
 
-            ack_no = ack_packet.sequence
+                if ack_packet.packet_type != ACK:
+                    continue
 
-            if ack_no in acked:
+                ack_no = ack_packet.sequence
 
-                print(
-                    f"ACK received {ack_no}"
-                )
+                # Accept ACKs only for packets sent and not already
+                # acknowledged.
+                if ack_no not in acked:
+                    continue
+
+                if acked[ack_no]:
+                    continue
+
+                metrics.ack_received()
+                print(f"ACK received {ack_no}")
 
                 acked[ack_no] = True
-
                 timers[ack_no].stop()
 
-
-                # Slide window
-                while (
-                    base < total and
-                    acked.get(base, False)
+                # Advance the window only over consecutively ACKed packets.
+                while base < total and acked.get(
+                    packets[base].sequence,
+                    False,
                 ):
                     base += 1
 
+            except socket.timeout:
+                pass
 
-        except socket.timeout:
-            pass
-
-
-        # Check individual timers
-        for seq in list(timers):
-
-            if (
-                not acked[seq]
-                and timers[seq].expired()
-            ):
+            # Retransmit only individual packets whose timers expired.
+            for seq in list(timers):
+                if acked[seq] or not timers[seq].expired():
+                    continue
 
                 if retries[seq] >= MAX_RETRIES:
-                    raise Exception(
-                        f"Packet {seq} failed"
+                    raise TimeoutError(
+                        f"Selective Repeat failed for packet {seq} "
+                        f"after {MAX_RETRIES} retransmissions"
                     )
 
+                sock.sendto(packets[seq].encode(), address)
 
-                print(
-                    f"Timeout packet {seq}"
-                )
-
-                metrics.retransmission()
                 metrics.data_packet_sent()
-
-                sock.sendto(
-                    packets[seq].encode(),
-                    address
-                )
-
-                print(
-                    f"Resending packet {seq}"
-                )
-
+                metrics.retransmission()
 
                 retries[seq] += 1
-
                 timers[seq].start()
+
+                print(
+                    f"Retransmitting packet {seq} "
+                    f"(retry {retries[seq]}/{MAX_RETRIES})"
+                )
+
+    finally:
+        sock.settimeout(None)
