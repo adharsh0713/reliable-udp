@@ -403,7 +403,7 @@ Receiver
 
 ---
 
-**# Phase 6 — Go-Back-N Sliding Window Protocol**
+** # Phase 6 — Go-Back-N Sliding Window Protocol**
 
 Completed.
 
@@ -486,7 +486,7 @@ Receiver behavior:
 
 ---
 
-**# Phase 7 — Selective Repeat Sliding Window Protocol**
+** # Phase 7 — Selective Repeat Sliding Window Protocol**
 
 Completed.
 
